@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthPulse IoT Master Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; color: #334155; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background-color 0.5s ease; }
+        
+        /* Emergency Mode Styles */
+        body.emergency-mode { background-color: #450a0a !important; }
+        body.emergency-mode .content-area, body.emergency-mode .sticky-patient-header { background-color: #7f1d1d !important; border-color: #991b1b !important; }
+        body.emergency-mode header { background-color: #991b1b !important; color: white !important; border-color: #7f1d1d !important; }
+        body.emergency-mode .text-slate-800, body.emergency-mode .text-slate-700, body.emergency-mode .text-slate-600 { color: #fecaca !important; }
+        body.emergency-mode .bg-white { background-color: #991b1b !important; border-color: #b91c1c !important; }
+
+        /* Layout Structure */
+        .main-container { flex: 1; display: flex; overflow: hidden; }
+        .sidebar { width: 280px; background: white; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; z-index: 20; transition: all 0.3s ease; }
+        .content-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #F1F5F9; position: relative; transition: all 0.3s ease; }
+        .scroll-container { flex: 1; overflow-y: auto; padding: 0 1.5rem 1.5rem 1.5rem; scroll-behavior: smooth; }
+
+        /* Navigation Tabs */
+        .tabs-header { display: flex; gap: 1rem; padding: 0 1.5rem; background: white; border-bottom: 1px solid #E2E8F0; transition: all 0.3s ease; }
+        .tab-btn { 
+            padding: 1rem 0.5rem; font-size: 0.9rem; font-weight: 600; color: #64748B; border-bottom: 3px solid transparent; transition: all 0.2s; cursor: pointer;
+        }
+        .tab-btn:hover { color: #0EA5E9; }
+        .tab-btn.active { color: #0EA5E9; border-bottom-color: #0EA5E9; }
+
+        /* Metric Cards */
+        .metric-card { 
+            background: white; border-radius: 10px; padding: 1rem; 
+            border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex; flex-direction: column; justify-content: space-between; position: relative;
+        }
+        .metric-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: #64748B; letter-spacing: 0.05em; }
+        .metric-val-lg { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; color: #1E293B; transition: color 0.3s; }
+        .metric-unit { font-size: 0.8rem; color: #94A3B8; font-weight: 500; }
+        .trend-arrow { font-size: 0.85rem; font-weight: 800; margin-left: 0.5rem; }
+
+        /* IoT Tech Styling */
+        .mono-data { font-family: 'Courier New', Courier, monospace; letter-spacing: -0.5px; }
+        .led-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .led-green { background: #22C55E; box-shadow: 0 0 6px #22C55E; }
+        .led-red { background: #EF4444; box-shadow: 0 0 6px #EF4444; }
+        .led-yellow { background: #EAB308; box-shadow: 0 0 6px #EAB308; }
+
+        /* ECG Canvas */
+        .ecg-box {
+            background: #0F172A; border-radius: 8px; position: relative; overflow: hidden;
+            border: 1px solid #334155; height: 140px; width: 100%;
+        }
+        .grid-overlay {
+            background-image: linear-gradient(rgba(51, 65, 85, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(51, 65, 85, 0.3) 1px, transparent 1px);
+            background-size: 20px 20px; width: 100%; height: 100%; position: absolute; top: 0; pointer-events: none;
+        }
+
+        /* Profile Images */
+        .profile-img { width: 90px; height: 90px; object-fit: cover; border-radius: 50%; border: 4px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #f1f5f9; }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .tab-content { display: none; }
+        .tab-content.active-view { display: block; }
+
+        /* Sticky Header Fix */
+        .sticky-patient-header {
+            position: sticky; top: 0; z-index: 50; 
+            background-color: #F1F5F9; padding-top: 1.5rem; padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.8); margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        /* Risk Progress Bars */
+        .risk-bar-container { width: 100%; background-color: #334155; border-radius: 9999px; height: 6px; overflow: hidden; margin-top: 4px;}
+        .risk-bar-fill { height: 100%; border-radius: 9999px; transition: width 0.5s ease-out, background-color 0.5s ease-out; }
+        
+        /* Custom Checkbox */
+        .proto-check { appearance: none; width: 16px; height: 16px; border: 2px solid #cbd5e1; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .proto-check:checked { background-color: #0ea5e9; border-color: #0ea5e9; }
+        .proto-check:checked::after { content: '✓'; color: white; font-size: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <!-- Main App Container -->
+    <div id="main-app" class="flex flex-col h-screen w-full">
+        <!-- Header -->
+        <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-6 z-40 shadow-sm flex-none">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-sky-500 to-blue-600 text-white w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xl shadow-md">M</div>
+                <div>
+                    <h1 class="font-bold text-slate-800 text-lg leading-tight">HealthPulse <span class="text-sky-600 font-light">IoT</span></h1>
+                    <div class="text-xs text-slate-400 font-medium" id="header-subtitle">AI-assisted Clinical Decision Engine</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="hidden md:flex items-center gap-3 text-xs font-mono bg-slate-900 text-green-400 px-4 py-2 rounded-full shadow-inner border border-slate-700">
+                    <span class="led-indicator led-green animate-pulse" id="sys-led"></span>
+                    <span id="sys-status">SYSTEM ONLINE</span>
+                    <span class="text-slate-500">|</span>
+                    <span>MQTT: CONNECTED</span>
+                </div>
+
+                <button onclick="generateSOAP()" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold px-4 py-2 rounded shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-notes-medical"></i> Generate EHR Note
+                </button>
+
+                <button onclick="document.getElementById('add-modal').classList.remove('hidden')" class="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2 rounded shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Admit Patient
+                </button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            
+            <!-- Sidebar: Patient List -->
+            <aside class="sidebar">
+                <div class="p-4 border-b border-slate-200 bg-slate-50/50">
+                    <input type="text" id="search" placeholder="Search Patient..." class="w-full text-sm bg-white border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-sky-500 shadow-sm transition" onkeyup="renderList()">
+                    <div class="flex gap-2 mt-3">
+                        <button onclick="filterList('All')" class="flex-1 text-xs bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 py-1.5 rounded font-medium transition shadow-sm">All</button>
+                        <button onclick="filterList('Critical')" class="flex-1 text-xs bg-red-50 border border-red-100 hover:bg-red-100 text-red-600 py-1.5 rounded font-medium transition shadow-sm">Critical</button>
+                    </div>
+                </div>
+                <div id="patient-list" class="flex-1 overflow-y-auto custom-scroll">
+                    <!-- List Generated by JS -->
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="content-area">
+                
+                <!-- Tab Navigation -->
+                <div class="tabs-header">
+                    <div class="tab-btn active" onclick="switchTab('live')">🩺 Clinical Live View</div>
+                    <div class="tab-btn" onclick="switchTab('iot')">📡 Device Health</div>
+                    <div class="tab-btn" onclick="switchTab('history')">📊 Analytics & Timeline</div>
+                    <div class="tab-btn" onclick="switchTab('ai')">🧠 AI Logic Inspector</div>
+                </div>
+
+                <!-- Scrollable Content -->
+                <div class="scroll-container custom-scroll relative">
+                    
+                    <!-- Patient Header -->
+                    <div class="sticky-patient-header flex flex-col xl:flex-row justify-between items-start mb-6 fade-in">
+                        <div class="flex items-center gap-5 mb-4 xl:mb-0">
+                            <div class="w-16 h-16 bg-white border-2 border-white shadow-lg rounded-full flex items-center justify-center text-3xl overflow-hidden relative">
+                                <span id="p-avatar">👤</span>
+                                <div class="absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white" id="status-dot-main"></div>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold text-slate-800 leading-tight flex items-center gap-2">
+                                    <span id="p-name">Loading...</span>
+                                    <button onclick="speakSummary()" title="Voice Summary" class="ml-2 text-slate-400 hover:text-sky-500 transition text-lg">
+                                        <i class="fa-solid fa-volume-high"></i>
+                                    </button>
+                                </h2>
+                                <div class="flex flex-wrap gap-3 mt-1 text-sm text-slate-500">
+                                    <span class="bg-slate-200/50 px-2 py-0.5 rounded text-slate-600 font-mono text-xs" id="p-id">ID: --</span>
+                                    <span><span class="font-semibold text-slate-700">Age:</span> <span id="p-age">--</span></span>
+                                    <span><span class="font-semibold text-slate-700">Cond:</span> <span id="p-cond" class="font-medium">--</span></span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actions & Simulation Controls -->
+                        <div class="flex flex-col items-start xl:items-end gap-3 w-full xl:w-auto">
+                            <!-- Top action buttons -->
+                            <div class="flex gap-2">
+                                <button onclick="showQRModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-3 py-1.5 rounded shadow-sm transition flex items-center gap-1">
+                                    <i class="fa-solid fa-qrcode"></i> Share QR
+                                </button>
+                                <button onclick="generateReport()" class="bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded shadow-sm transition flex items-center gap-1">
+                                    <i class="fa-solid fa-file-medical"></i> Quick Report
+                                </button>
+                            </div>
+
+                            <div class="flex items-center gap-2 bg-white rounded-lg border border-slate-200 p-1 shadow-sm w-full xl:w-auto overflow-x-auto">
+                                <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-2 pr-1">Sim:</div>
+                                <button onclick="setSimState('Normal')" class="px-3 py-1.5 text-xs font-medium hover:bg-green-50 text-slate-600 hover:text-green-700 rounded transition">Normal</button>
+                                <button onclick="setSimState('Fever')" class="px-3 py-1.5 text-xs font-medium hover:bg-yellow-50 text-slate-600 hover:text-yellow-700 rounded transition">Fever</button>
+                                <button onclick="setSimState('Hypoxia')" class="px-3 py-1.5 text-xs font-medium hover:bg-orange-50 text-slate-600 hover:text-orange-700 rounded transition">Hypoxia</button>
+                                <button onclick="toggleEmergencyMode()" id="btn-emergency" class="px-3 py-1.5 text-xs font-bold bg-red-50 border border-red-200 text-red-600 hover:bg-red-600 hover:text-white rounded shadow-sm transition ml-1 flex items-center gap-1">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> EMERGENCY
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 1: CLINICAL LIVE VIEW -->
+                    <div id="tab-live" class="tab-content active-view fade-in">
+                        
+                        <!-- Golden Hour & Alerts -->
+                        <div id="golden-hour-banner" class="hidden bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-3 rounded mb-4 shadow-sm flex justify-between items-center transition-colors duration-500">
+                            <div class="flex items-center gap-3">
+                                <div class="bg-orange-200 p-2 rounded-full"><i class="fa-solid fa-hourglass-half animate-spin-slow"></i></div>
+                                <div>
+                                    <span class="font-bold text-sm block leading-none">Golden Hour Protocol Active</span>
+                                    <span class="text-xs opacity-80">Immediate intervention recommended</span>
+                                </div>
+                            </div>
+                            <div class="font-mono text-2xl font-bold tracking-wider" id="golden-hour-timer">00:00</div>
+                        </div>
+
+                        <div id="alert-banner" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 shadow-sm flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-bell animate-bounce"></i>
+                                <span class="font-bold text-sm" id="alert-text">Early Warning: Abnormal parameters detected.</span>
+                            </div>
+                        </div>
+
+                        <div class="grid lg:grid-cols-3 gap-6">
+                            <!-- Left Col: Vitals, ECG, Labs -->
+                            <div class="lg:col-span-2 space-y-4">
+                                <!-- ECG -->
+                                <div class="ecg-box shadow-md">
+                                    <div class="grid-overlay"></div>
+                                    <div class="absolute top-3 left-4 text-xs font-mono text-green-400 z-10 font-bold tracking-widest flex items-center gap-2">
+                                        <span class="animate-pulse">●</span> LEAD II (ECG)
+                                    </div>
+                                    <canvas id="ecg-canvas" class="w-full h-full"></canvas>
+                                </div>
+
+                                <!-- Primary Metrics -->
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div class="metric-card border-l-4 border-l-rose-500">
+                                        <span class="metric-label text-rose-600">Heart Rate</span>
+                                        <div>
+                                            <span class="metric-val-lg" id="val-hr">--</span> 
+                                            <span id="trend-hr" class="trend-arrow"></span>
+                                            <span class="metric-unit block mt-1">bpm</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card border-l-4 border-l-sky-500">
+                                        <span class="metric-label text-sky-600">SpO2</span>
+                                        <div>
+                                            <span class="metric-val-lg" id="val-spo2">--</span> 
+                                            <span id="trend-spo2" class="trend-arrow"></span>
+                                            <span class="metric-unit block mt-1">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card border-l-4 border-l-amber-500">
+                                        <span class="metric-label text-amber-600">Temp</span>
+                                        <div>
+                                            <span class="metric-val-lg" id="val-temp">--</span> 
+                                            <span id="trend-temp" class="trend-arrow"></span>
+                                            <span class="metric-unit block mt-1">°C</span>
+                                        </div>
+                                    </div>
+                                    <div class="metric-card border-l-4 border-l-slate-500">
+                                        <span class="metric-label text-slate-600">Pressure</span>
+                                        <div>
+                                            <span class="metric-val-lg text-2xl" id="val-bp">--/--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Secondary Metrics & Labs Row -->
+                                <div class="grid md:grid-cols-2 gap-4">
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div class="bg-white p-3 rounded border border-slate-200">
+                                            <div class="text-xs text-slate-500 uppercase font-semibold">Resp Rate</div>
+                                            <div class="text-xl font-bold text-slate-700"><span id="val-rr">--</span> <span class="text-xs font-normal">rpm</span></div>
+                                        </div>
+                                        <div class="bg-white p-3 rounded border border-slate-200">
+                                            <div class="text-xs text-slate-500 uppercase font-semibold">HRV (Stress)</div>
+                                            <div class="text-xl font-bold text-slate-700"><span id="val-hrv">--</span> <span class="text-xs font-normal">ms</span></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Lab Panel -->
+                                    <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h4 class="text-xs font-bold text-slate-700 uppercase"><i class="fa-solid fa-vial text-purple-500 mr-1"></i> Rapid Lab Panel</h4>
+                                            <span class="text-[9px] text-slate-400 font-mono">15m ago</span>
+                                        </div>
+                                        <div class="grid grid-cols-3 gap-2 text-center">
+                                            <div class="bg-slate-50 p-2 rounded">
+                                                <div class="text-[10px] text-slate-500 font-bold mb-1">LACTATE</div>
+                                                <div class="text-sm font-bold text-slate-800" id="lab-lactate">--</div>
+                                            </div>
+                                            <div class="bg-slate-50 p-2 rounded">
+                                                <div class="text-[10px] text-slate-500 font-bold mb-1">WBC</div>
+                                                <div class="text-sm font-bold text-slate-800" id="lab-wbc">--</div>
+                                            </div>
+                                            <div class="bg-slate-50 p-2 rounded">
+                                                <div class="text-[10px] text-slate-500 font-bold mb-1">CRP</div>
+                                                <div class="text-sm font-bold text-slate-800" id="lab-crp">--</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right Col: Risk, Protocols, Escalation -->
+                            <div class="space-y-4">
+                                <!-- Risk Overview with Scores -->
+                                <div class="bg-slate-900 rounded-xl p-5 shadow-lg text-white relative overflow-hidden">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 class="font-bold text-lg">Sepsis Risk</h3>
+                                            <div class="text-xs text-slate-400">AI Probability Score</div>
+                                        </div>
+                                        <div class="text-3xl font-bold text-green-400" id="risk-score">--%</div>
+                                    </div>
+                                    
+                                    <!-- Scoring Systems -->
+                                    <div class="flex justify-between mb-4 bg-slate-800 rounded p-2 text-sm border border-slate-700">
+                                        <div><span class="text-slate-400 text-xs">qSOFA:</span> <span class="font-bold ml-1" id="score-qsofa">--</span></div>
+                                        <div><span class="text-slate-400 text-xs">NEWS2:</span> <span class="font-bold ml-1" id="score-news">--</span></div>
+                                    </div>
+                                </div>
+
+                                <!-- Escalation Workflow -->
+                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                    <h4 class="text-sm font-bold text-slate-700 mb-3 border-b pb-2">Clinical Escalation</h4>
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center transition-all" id="esc-icon">
+                                            <i class="fa-solid fa-user-doctor text-slate-400 text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-bold text-slate-700 transition-colors" id="esc-status">Monitoring Active</div>
+                                            <div class="text-xs text-slate-500 mt-0.5" id="esc-detail">No critical alerts generated.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Clinical Protocol Engine (Checklist) -->
+                                <div class="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col transition-all" id="protocol-card">
+                                    <div class="p-3 border-b border-slate-100 bg-slate-50/50 rounded-t-xl flex justify-between items-center">
+                                        <h3 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-list-check text-sky-600 mr-1"></i> 3-Hour Bundle</h3>
+                                        <span class="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full" id="bundle-status">Standby</span>
+                                    </div>
+                                    <div class="p-4 space-y-3" id="protocol-checklist">
+                                        <label class="flex items-start gap-3 cursor-pointer group">
+                                            <input type="checkbox" class="proto-check mt-0.5">
+                                            <span class="text-sm text-slate-600 group-hover:text-slate-900 transition">Measure Lactate Level</span>
+                                        </label>
+                                        <label class="flex items-start gap-3 cursor-pointer group">
+                                            <input type="checkbox" class="proto-check mt-0.5">
+                                            <span class="text-sm text-slate-600 group-hover:text-slate-900 transition">Obtain Blood Cultures</span>
+                                        </label>
+                                        <label class="flex items-start gap-3 cursor-pointer group">
+                                            <input type="checkbox" class="proto-check mt-0.5">
+                                            <span class="text-sm text-slate-600 group-hover:text-slate-900 transition">Administer Broad-Spectrum Abx</span>
+                                        </label>
+                                        <label class="flex items-start gap-3 cursor-pointer group">
+                                            <input type="checkbox" class="proto-check mt-0.5">
+                                            <span class="text-sm text-slate-600 group-hover:text-slate-900 transition">30ml/kg Crystalloid Fluid</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: DEVICE HEALTH (Expanded) -->
+                    <div id="tab-iot" class="tab-content fade-in">
+                        <div class="grid lg:grid-cols-3 gap-6 mb-6">
+                            
+                            <!-- ECG Device -->
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="bg-emerald-100 p-2 rounded-lg text-emerald-600"><i class="fa-solid fa-heart-pulse"></i></div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-800 text-sm">ECG Monitor</h3>
+                                            <div class="text-[10px] text-slate-400 font-mono">ID: ECG-3V-092</div>
+                                        </div>
+                                    </div>
+                                    <span class="led-indicator led-green animate-pulse mt-1"></span>
+                                </div>
+                                <div class="space-y-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Connection</span>
+                                        <span class="font-bold text-emerald-600">Excellent (-42dBm)</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Impedance Check</span>
+                                        <span class="font-mono text-slate-700">Pass (&lt; 5kΩ)</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">Battery</span><span class="font-bold">98%</span></div>
+                                        <div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-emerald-500 h-full w-[98%] rounded-full"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- PulseOx Device -->
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="bg-sky-100 p-2 rounded-lg text-sky-600"><i class="fa-solid fa-fingerprint"></i></div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-800 text-sm">SpO2 Clip</h3>
+                                            <div class="text-[10px] text-slate-400 font-mono">ID: POX-F-881</div>
+                                        </div>
+                                    </div>
+                                    <span class="led-indicator led-green animate-pulse mt-1"></span>
+                                </div>
+                                <div class="space-y-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Connection</span>
+                                        <span class="font-bold text-emerald-600">Good (-55dBm)</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Perfusion Index</span>
+                                        <span class="font-mono text-slate-700" id="iot-pi-read">3.5%</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">Battery</span><span class="font-bold text-amber-500">45%</span></div>
+                                        <div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-amber-500 h-full w-[45%] rounded-full"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Temp Device -->
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="bg-amber-100 p-2 rounded-lg text-amber-600"><i class="fa-solid fa-temperature-half"></i></div>
+                                        <div>
+                                            <h3 class="font-bold text-slate-800 text-sm">Axillary Temp</h3>
+                                            <div class="text-[10px] text-slate-400 font-mono">ID: TMP-A-110</div>
+                                        </div>
+                                    </div>
+                                    <span class="led-indicator led-green animate-pulse mt-1"></span>
+                                </div>
+                                <div class="space-y-3 text-sm">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Connection</span>
+                                        <span class="font-bold text-emerald-600">Excellent (-38dBm)</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-500">Calibration</span>
+                                        <span class="font-mono text-slate-700">Valid</span>
+                                    </div>
+                                    <div class="mt-2">
+                                        <div class="flex justify-between text-xs mb-1"><span class="text-slate-500">Battery</span><span class="font-bold">82%</span></div>
+                                        <div class="w-full bg-slate-100 rounded-full h-1.5"><div class="bg-emerald-500 h-full w-[82%] rounded-full"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Central Hub / Gateway Status -->
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h3 class="text-lg font-bold text-slate-800 mb-4">Master Hub (ESP32-WROOM)</h3>
+                                <div class="space-y-3 text-sm">
+                                    <div class="flex justify-between border-b border-slate-100 pb-2"><span class="text-slate-500">Firmware</span><span class="font-mono font-bold">v4.1.2-Secure</span></div>
+                                    <div class="flex justify-between border-b border-slate-100 pb-2"><span class="text-slate-500">Uptime</span><span class="font-mono" id="iot-uptime">00:00:00</span></div>
+                                    <div class="flex justify-between border-b border-slate-100 pb-2"><span class="text-slate-500">Active Nodes</span><span class="font-bold">3/3</span></div>
+                                    <div class="flex justify-between"><span class="text-slate-500">Sync Latency</span><span class="font-mono text-green-600 font-bold" id="iot-latency">42 ms</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-slate-900 rounded-xl p-6 text-green-400 font-mono text-xs shadow-lg overflow-hidden relative">
+                                <div class="absolute top-2 right-2 text-slate-500 text-[10px]">RAW BLE/WIFI STREAM</div>
+                                <div id="raw-console" class="space-y-1 h-40 overflow-y-auto custom-scroll"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 3: HISTORY & ANALYTICS -->
+                    <div id="tab-history" class="tab-content fade-in">
+                        <div class="grid lg:grid-cols-3 gap-6 mb-6">
+                            <!-- Left: Charts -->
+                            <div class="lg:col-span-2 space-y-4">
+                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                    <h4 class="text-sm font-bold text-slate-700 mb-1">Heart Rate & SpO2 Correlation</h4>
+                                    <div class="h-64 w-full"><canvas id="history-chart"></canvas></div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Clinical Timeline & Audit Log -->
+                            <div class="lg:col-span-1 space-y-6">
+                                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm h-72 flex flex-col">
+                                    <h4 class="text-sm font-bold text-slate-700 mb-4 flex items-center border-b pb-2">
+                                        <i class="fa-solid fa-clock-rotate-left mr-2 text-sky-500"></i> Clinical Event Timeline
+                                    </h4>
+                                    <div id="patient-timeline" class="flex-1 space-y-0 pl-2 border-l-2 border-slate-100 ml-2 overflow-y-auto custom-scroll relative pr-2">
+                                        <!-- Timeline populated by JS -->
+                                    </div>
+                                </div>
+
+                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm h-64 flex flex-col">
+                                    <h4 class="text-sm font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">
+                                        <i class="fa-solid fa-shield-halved mr-2 text-slate-500"></i> Access Audit Log
+                                    </h4>
+                                    <div id="audit-log" class="flex-1 overflow-y-auto custom-scroll text-xs font-mono space-y-2">
+                                        <!-- Audit populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 4: AI LOGIC & SIMULATOR -->
+                    <div id="tab-ai" class="tab-content fade-in">
+                        <div class="grid lg:grid-cols-2 gap-6 mb-8 mt-2">
+                            <!-- Explainable AI Panel -->
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                <h3 class="text-lg font-bold text-slate-800 mb-4">Risk Contribution Weights</h3>
+                                <p class="text-xs text-slate-500 mb-6">Real-time breakdown of parameters driving the Sepsis Probability Score.</p>
+                                
+                                <div class="space-y-5">
+                                    <div>
+                                        <div class="flex justify-between text-xs font-bold uppercase mb-1"><span class="text-slate-600">Heart Rate (Tachycardia)</span><span id="risk-hr-val" class="text-rose-600">0%</span></div>
+                                        <div class="risk-bar-container"><div id="risk-bar-hr" class="risk-bar-fill bg-rose-500" style="width: 0%"></div></div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-xs font-bold uppercase mb-1"><span class="text-slate-600">SpO2 (Hypoxemia)</span><span id="risk-spo2-val" class="text-sky-600">0%</span></div>
+                                        <div class="risk-bar-container"><div id="risk-bar-spo2" class="risk-bar-fill bg-sky-500" style="width: 0%"></div></div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-xs font-bold uppercase mb-1"><span class="text-slate-600">Temperature (Hyper/Hypothermia)</span><span id="risk-temp-val" class="text-amber-600">0%</span></div>
+                                        <div class="risk-bar-container"><div id="risk-bar-temp" class="risk-bar-fill bg-amber-500" style="width: 0%"></div></div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-xs font-bold uppercase mb-1"><span class="text-slate-600">Blood Pressure (Hypotension)</span><span id="risk-bp-val" class="text-slate-500">0%</span></div>
+                                        <div class="risk-bar-container"><div id="risk-bar-bp" class="risk-bar-fill bg-slate-400" style="width: 0%"></div></div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-8 bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex items-start gap-3">
+                                    <i class="fa-solid fa-chart-line text-indigo-500 mt-0.5 text-lg"></i>
+                                    <div>
+                                        <div class="text-sm font-bold text-indigo-900">Similar Patient Outcomes</div>
+                                        <div class="text-xs text-indigo-700 mt-1 leading-relaxed">Based on 1,204 analyzed profiles with similar trajectories, <b>82%</b> responded favorably to rapid fluid resuscitation within the first hour of protocol activation.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- What-If Scenario Simulator -->
+                            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                                <div class="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h4 class="font-bold text-lg text-slate-800">What-If Simulator</h4>
+                                        <p class="text-xs text-slate-500">Manipulate vitals to observe engine behavior.</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex-1 flex flex-col justify-between">
+                                    <div class="space-y-6">
+                                        <div>
+                                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                                <span>Simulated Heart Rate</span> <span id="sim-hr-val" class="text-rose-600 bg-rose-50 px-2 py-0.5 rounded">80 bpm</span>
+                                            </div>
+                                            <input type="range" id="sim-hr" min="40" max="200" value="80" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-rose-500" oninput="updateSimulator()">
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                                <span>Simulated SpO2</span> <span id="sim-spo2-val" class="text-sky-600 bg-sky-50 px-2 py-0.5 rounded">98%</span>
+                                            </div>
+                                            <input type="range" id="sim-spo2" min="70" max="100" value="98" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500" oninput="updateSimulator()">
+                                        </div>
+                                        <div>
+                                            <div class="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                                <span>Simulated Temp</span> <span id="sim-temp-val" class="text-amber-600 bg-amber-50 px-2 py-0.5 rounded">37.0 °C</span>
+                                            </div>
+                                            <input type="range" id="sim-temp" min="35.0" max="42.0" step="0.1" value="37.0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500" oninput="updateSimulator()">
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-8 bg-slate-50 border border-slate-200 rounded-xl p-5 text-center shadow-inner">
+                                        <div class="text-xs text-slate-500 uppercase font-bold tracking-wider mb-2">Projected Score</div>
+                                        <div id="sim-risk-score" class="text-5xl font-extrabold text-emerald-500 transition-colors duration-500">12%</div>
+                                        <div id="sim-risk-text" class="text-xs font-medium text-slate-600 mt-3 h-8">Patient stable. Parameters within normal limits.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modals -->
+
+    <!-- Modal: SOAP Note Generator -->
+    <div id="soap-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm px-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 transform transition-all relative">
+            <button onclick="document.getElementById('soap-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-2xl font-bold">&times;</button>
+            <h3 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2"><i class="fa-solid fa-file-signature text-emerald-600 mr-2"></i> Auto-Generated EHR Note (SOAP)</h3>
+            <textarea id="soap-content" class="w-full h-64 p-4 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:border-emerald-500" readonly></textarea>
+            <div class="mt-4 flex justify-between items-center">
+                <span class="text-xs text-slate-400">Note populated based on current telemetry data.</span>
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('soap-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded transition">Cancel</button>
+                    <button onclick="signSOAP()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-5 py-2 rounded shadow transition">Sign & Save to EHR</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Other Modals (Add, QR, About) remain functionally identical, keeping structure clean -->
+    <div id="add-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-96 p-6 transform transition-all relative">
+            <h3 class="text-lg font-bold text-slate-800 mb-4">Admit New Patient</h3>
+            <form onsubmit="addNewPatient(event)" class="space-y-3">
+                <input name="name" required placeholder="Full Name" class="w-full text-sm border border-slate-300 p-2.5 rounded-lg">
+                <div class="flex gap-2">
+                    <input name="age" type="number" required placeholder="Age" class="w-1/2 text-sm border border-slate-300 p-2.5 rounded-lg">
+                    <select name="gender" class="w-1/2 text-sm border border-slate-300 p-2.5 rounded-lg bg-white"><option>Male</option><option>Female</option></select>
+                </div>
+                <select name="condition" class="w-full text-sm border border-slate-300 p-2.5 rounded-lg bg-white">
+                    <option value="Normal">Stable / Normal</option><option value="Fever">Fever</option><option value="Hypoxia">Respiratory Distress</option><option value="Sepsis">Sepsis Risk</option>
+                </select>
+                <div class="flex justify-end gap-2 mt-6">
+                    <button type="button" onclick="document.getElementById('add-modal').classList.add('hidden')" class="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm">Admit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="qr-modal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center backdrop-blur-sm px-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all relative text-center">
+            <button onclick="document.getElementById('qr-modal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 text-2xl font-bold">&times;</button>
+            <h3 class="text-lg font-bold text-slate-800 mb-2">Patient Remote Access</h3>
+            <div class="bg-slate-100 p-4 rounded-xl inline-block mb-4 shadow-inner"><img id="qr-img" src="" alt="QR" class="w-48 h-48 mx-auto"></div>
+            <div class="text-xs text-slate-400 font-mono truncate px-4" id="qr-url-text"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA & STATE ---
+        const FIRST_NAMES_M = ["Aarav", "Vihaan", "Arjun", "Reyansh", "Aditya", "Sai", "Ishaan", "Rohan"];
+        const FIRST_NAMES_F = ["Aadya", "Diya", "Ananya", "Kiara", "Priya", "Neha", "Pooja", "Riya"];
+        const LAST_NAMES = ["Patel", "Sharma", "Singh", "Kumar", "Gupta", "Rao", "Reddy", "Khan"];
+
+        const store = {
+            patients: [],
+            selectedId: null,
+            filter: 'All',
+            simTimer: null,
+            iotTimer: null,
+            battery: 4.2,
+            charts: {},
+            isEmergency: false
+        };
+
+        function generatePatient(index) {
+            const isMale = Math.random() > 0.5;
+            const name = `${isMale ? FIRST_NAMES_M[index%8] : FIRST_NAMES_F[index%8]} ${LAST_NAMES[index%8]}`;
+            const conds = ['Normal', 'Normal', 'Normal', 'Fever', 'Hypoxia', 'Sepsis'];
+            
+            const baseTime = new Date();
+            baseTime.setMinutes(baseTime.getMinutes() - 15);
+
+            return {
+                id: `MS-${1000 + index}`,
+                name: name,
+                age: Math.floor(Math.random() * 60) + 20,
+                gender: isMale ? 'Male' : 'Female',
+                condition: conds[Math.floor(Math.random() * conds.length)],
+                baseHR: 65 + Math.random() * 20,
+                baseBP: [115 + Math.floor(Math.random()*15), 75 + Math.floor(Math.random()*10)],
+                prevVitals: { hr: 0, spo2: 0, temp: 0, risk: 0 },
+                currentVitals: { hr: 0, spo2: 0, temp: 0, sys: 0, dia:0, rr:0, risk: 0 },
+                timeline: [{ time: baseTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), msg: "Baseline vitals stabilized.", type: 'info' }],
+                goldenHourStart: null,
+                escalationLevel: 0, // 0: None, 1: Paged, 2: Ack
+                escTimer: null,
+                protocolChecked: false
+            };
+        }
+
+        window.addEventListener('load', () => {
+            for(let i=0; i<15; i++) store.patients.push(generatePatient(i));
+            initDashboardView();
+        });
+
+        // --- DASHBOARD INIT ---
+        function initDashboardView() {
+            renderList();
+            initHistoryCharts();
+            selectPatient(store.patients[0].id);
+            requestAnimationFrame(ecgLoop);
+            startIoTSimulation();
+            updateSimulator();
+            addAuditLog("System initialized. Clinician authenticated.");
+        }
+
+        // --- TAB NAVIGATION ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active-view'));
+            document.getElementById(`tab-${tabId}`).classList.add('active-view');
+
+            if(tabId === 'history' && store.charts.history) {
+                setTimeout(() => { store.charts.history.resize(); }, 100);
+            }
+        }
+
+        // --- PATIENT SELECTION ---
+        function renderList() {
+            const list = document.getElementById('patient-list');
+            list.innerHTML = '';
+            const search = document.getElementById('search').value.toLowerCase();
+            
+            const filtered = store.patients.filter(p => {
+                const matchName = p.name.toLowerCase().includes(search) || p.id.toLowerCase().includes(search);
+                const matchFilter = store.filter === 'All' ? true : (p.condition === 'Sepsis' || p.condition === 'Hypoxia');
+                return matchName && matchFilter;
+            });
+
+            filtered.forEach(p => {
+                const div = document.createElement('div');
+                div.className = `p-4 flex justify-between items-center cursor-pointer border-b border-slate-100 hover:bg-slate-50 transition ${store.selectedId === p.id ? 'bg-sky-50 border-l-4 border-l-sky-500' : ''}`;
+                div.onclick = () => selectPatient(p.id);
+                let dot = p.condition === 'Sepsis' ? `<span class="led-indicator led-red animate-pulse"></span>` : 
+                          (p.condition !== 'Normal' ? `<span class="led-indicator led-yellow"></span>` : `<span class="led-indicator led-green"></span>`);
+                div.innerHTML = `<div><div class="font-bold text-sm text-slate-700">${p.name}</div><div class="text-xs text-slate-400 font-mono">${p.id}</div></div>${dot}`;
+                list.appendChild(div);
+            });
+        }
+
+        function filterList(type) { store.filter = type; renderList(); }
+
+        function selectPatient(id) {
+            store.selectedId = id;
+            if(store.isEmergency) toggleEmergencyMode();
+            renderList(); 
+            
+            const p = store.patients.find(x => x.id === id);
+            
+            document.getElementById('p-name').innerText = p.name;
+            document.getElementById('p-id').innerText = `ID: ${p.id}`;
+            document.getElementById('p-age').innerText = p.age;
+            document.getElementById('p-cond').innerText = p.condition;
+            document.getElementById('p-avatar').innerText = p.gender === 'Male' ? '👨🏻' : '👩🏽';
+            
+            const dot = document.getElementById('status-dot-main');
+            dot.className = `absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${p.condition === 'Sepsis' ? 'bg-red-500 animate-pulse' : p.condition === 'Normal' ? 'bg-green-500' : 'bg-yellow-500'}`;
+
+            // Reset UI for new patient
+            document.querySelectorAll('.proto-check').forEach(c => c.checked = false);
+            p.protocolChecked = false;
+            
+            if(store.simTimer) clearInterval(store.simTimer);
+            updateSimulation(); 
+            
+            // Sync Simulator
+            document.getElementById('sim-hr').value = Math.round(p.currentVitals.hr) || 80;
+            document.getElementById('sim-spo2').value = Math.round(p.currentVitals.spo2) || 98;
+            document.getElementById('sim-temp').value = p.currentVitals.temp ? p.currentVitals.temp.toFixed(1) : 37.0;
+            updateSimulator();
+
+            store.simTimer = setInterval(updateSimulation, 1000);
+            addAuditLog(`Accessed patient record: $A{p.name} (${p.id})`);
+        }
+
+        // --- SIMULATION CONTROLS ---
+        function setSimState(cond) {
+            if(!store.selectedId) return;
+            if(store.isEmergency && cond !== 'Sepsis') toggleEmergencyMode();
+            
+            const p = store.patients.find(x => x.id === store.selectedId);
+            const oldCond = p.condition;
+            p.condition = cond;
+            document.getElementById('p-cond').innerText = p.condition;
+            
+            if(oldCond !== cond) {
+                addAuditLog(`Override: Condition forcefully changed to ${cond}.`);
+                if(cond === 'Sepsis') {
+                    p.timeline.unshift({ time: getNow(), msg: "CRITICAL: Rapid deterioration simulated.", type: 'crit' });
+                }
+            }
+        }
+
+        function toggleEmergencyMode() {
+            store.isEmergency = !store.isEmergency;
+            const btn = document.getElementById('btn-emergency');
+            if (store.isEmergency) {
+                document.body.classList.add('emergency-mode');
+                btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation animate-ping"></i> ACTIVE`;
+                setSimState('Sepsis');
+
+                // AUTO-SEND TELEGRAM NOTIFICATION
+                const p = store.patients.find(x => x.id === store.selectedId);
+                if (p) {
+                    const v = p.currentVitals;
+                    const date = new Date().toLocaleString();
+                    const text = `🚨 <b>CRITICAL MEDICAL ALERT</b> 🚨\n\n` +
+                                 `👤 <b>PATIENT INFO</b>\n` +
+                                 `• <b>Name:</b> ${p.name}\n` +
+                                 `• <b>ID:</b> ${p.id}\n` +
+                                 `• <b>Age/Sex:</b> ${p.age}y / ${p.gender}\n\n` +
+                                 `📊 <b>LIVE VITALS</b> (${date})\n` +
+                                 `• <b>HR:</b> ${Math.round(v.hr)} bpm ⚠️\n` +
+                                 `• <b>SpO2:</b> ${Math.round(v.spo2)}% ⚠️\n` +
+                                 `• <b>BP:</b> ${Math.round(v.sys)}/${Math.round(v.dia)} mmHg\n` +
+                                 `• <b>Temp:</b> ${v.temp.toFixed(1)} °C\n` +
+                                 `• <b>RR:</b> ${Math.round(v.rr)} rpm\n\n` +
+                                 `🩸 <b>AI SEPSIS RISK:</b> ${Math.round(v.risk)}%\n\n` +
+                                 `⚠️ <b>ACTION REQUIRED:</b>\nRapid deterioration detected. Golden Hour Protocol activated. Immediate bedside evaluation by Rapid Response Team required.`;
+                    
+                    fetch('/api/notify', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text })
+                    }).catch(console.error);
+                }
+            } else {
+                document.body.classList.remove('emergency-mode');
+                btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> EMERGENCY`;
+                setSimState('Normal');
+            }
+        }
+
+        // --- CORE SIMULATION LOOP ---
+        function getSimulatedVitals(p) {
+            const noise = (fac) => (Math.random() - 0.5) * fac;
+            let hr, spo2, temp, sys, dia, rr, hrv, ppi, bio;
+
+            if(p.condition === 'Normal') {
+                hr = p.baseHR + noise(5); spo2 = 98 + noise(1); temp = 36.6 + noise(0.2);
+                sys = p.baseBP[0] + noise(5); dia = p.baseBP[1] + noise(5); rr = 16 + noise(2);
+            } else if(p.condition === 'Fever') {
+                hr = p.baseHR + 15 + noise(5); spo2 = 97 + noise(1); temp = 38.6 + noise(0.4);
+                sys = p.baseBP[0] + noise(5); dia = p.baseBP[1] + noise(5); rr = 20 + noise(2);
+            } else if(p.condition === 'Hypoxia') {
+                hr = p.baseHR + 25 + noise(5); spo2 = 88 + noise(3); temp = 36.8 + noise(0.2);
+                sys = p.baseBP[0] + 10 + noise(5); dia = p.baseBP[1] + 5 + noise(5); rr = 28 + noise(3);
+            } else if(p.condition === 'Sepsis') {
+                hr = p.baseHR + 40 + noise(10); spo2 = 92 + noise(3); temp = 39.2 + noise(0.5);
+                sys = 85 + noise(10); dia = 50 + noise(10); rr = 32 + noise(4);
+            }
+
+            let risk = 5;
+            if(hr > 100) risk += 25;
+            if(spo2 < 94) risk += 30;
+            if(sys < 90) risk += 35;
+            if(temp > 38) risk += 10;
+            risk = Math.min(99, risk);
+
+            p.prevVitals = { ...p.currentVitals };
+            p.currentVitals = { hr, spo2, temp, sys, dia, rr, hrv: 60 - risk/2, ppi: 3.5 - risk/40, bio: 500 + risk, risk };
+            return p.currentVitals;
+        }
+
+        function updateSimulation() {
+            if(!store.selectedId) return;
+            const p = store.patients.find(x => x.id === store.selectedId);
+            const v = getSimulatedVitals(p);
+
+            // Update DOM
+            document.getElementById('val-hr').innerText = Math.round(v.hr);
+            document.getElementById('val-spo2').innerText = Math.round(v.spo2);
+            document.getElementById('val-temp').innerText = v.temp.toFixed(1);
+            document.getElementById('val-bp').innerText = `${Math.round(v.sys)}/${Math.round(v.dia)}`;
+            document.getElementById('val-rr').innerText = Math.round(v.rr);
+            document.getElementById('val-hrv').innerText = Math.round(v.hrv);
+            
+            updateTrendArrow('trend-hr', v.hr, p.prevVitals.hr, true); 
+            updateTrendArrow('trend-spo2', v.spo2, p.prevVitals.spo2, false); 
+            updateTrendArrow('trend-temp', v.temp, p.prevVitals.temp, true);
+
+            // Update Risk & Contributions
+            const riskEl = document.getElementById('risk-score');
+            riskEl.innerText = `${Math.round(v.risk)}%`;
+            riskEl.className = v.risk > 50 ? "text-3xl font-bold text-red-500 animate-pulse" : "text-3xl font-bold text-green-400";
+
+            const cHR = Math.min(100, Math.max(0, (v.hr - 60)/80 * 100)); 
+            const cSpO2 = Math.min(100, Math.max(0, (100 - v.spo2)/10 * 100)); 
+            const cTemp = Math.min(100, Math.max(0, (v.temp - 36.5)/3.5 * 100)); 
+            const cBP = Math.min(100, Math.max(0, (120 - v.sys)/40 * 100));
+
+            document.getElementById('risk-bar-hr').style.width = `${cHR}%`;
+            document.getElementById('risk-hr-val').innerText = `${Math.round(cHR)}%`;
+            document.getElementById('risk-bar-spo2').style.width = `${cSpO2}%`;
+            document.getElementById('risk-spo2-val').innerText = `${Math.round(cSpO2)}%`;
+            document.getElementById('risk-bar-temp').style.width = `${cTemp}%`;
+            document.getElementById('risk-temp-val').innerText = `${Math.round(cTemp)}%`;
+            document.getElementById('risk-bar-bp').style.width = `${cBP}%`;
+            document.getElementById('risk-bp-val').innerText = `${Math.round(cBP)}%`;
+
+            // NEW: Update Labs
+            document.getElementById('lab-lactate').innerText = p.condition === 'Sepsis' ? (3.5 + Math.random()*1).toFixed(1) : (1.0 + Math.random()*0.5).toFixed(1);
+            document.getElementById('lab-lactate').className = p.condition === 'Sepsis' ? "text-sm font-bold text-red-600" : "text-sm font-bold text-slate-800";
+            document.getElementById('lab-wbc').innerText = p.condition === 'Sepsis' ? (18.2 + Math.random()*2).toFixed(1) : (7.5 + Math.random()*1).toFixed(1);
+            document.getElementById('lab-wbc').className = p.condition === 'Sepsis' ? "text-sm font-bold text-red-600" : "text-sm font-bold text-slate-800";
+            document.getElementById('lab-crp').innerText = p.condition === 'Sepsis' ? Math.round(120 + Math.random()*20) : Math.round(2 + Math.random()*3);
+            
+            // NEW: Scores
+            let qsofa = 0; if(v.rr>=22) qsofa++; if(v.sys<=100) qsofa++; if(v.risk>60) qsofa++;
+            let news = Math.round((v.risk/100) * 12); // Mock NEWS correlation
+            document.getElementById('score-qsofa').innerText = qsofa;
+            document.getElementById('score-qsofa').className = qsofa >= 2 ? "font-bold ml-1 text-red-400" : "font-bold ml-1 text-green-400";
+            document.getElementById('score-news').innerText = news;
+
+            // NEW: Golden Hour & Escalation Workflow
+            updateGoldenHour(p);
+
+            // Timeline Triggers
+            if(p.prevVitals.hr > 0) {
+                if (v.hr > 100 && p.prevVitals.hr <= 100) p.timeline.unshift({ time: getNow(), msg: `Tachycardia detected (${Math.round(v.hr)} bpm)`, type: 'warn' });
+                if (v.spo2 < 94 && p.prevVitals.spo2 >= 94) p.timeline.unshift({ time: getNow(), msg: `Desaturation alert (${Math.round(v.spo2)}%)`, type: 'crit' });
+                if (v.risk > 50 && p.prevVitals.risk <= 50) p.timeline.unshift({ time: getNow(), msg: `AI Sepsis Risk threshold crossed!`, type: 'crit' });
+                if (p.timeline.length > 20) p.timeline.pop();
+            }
+
+            renderTimeline(p);
+        }
+
+        // --- NEW FEATURES LOGIC ---
+        function getNow() { return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit', second:'2-digit'}); }
+
+        function updateGoldenHour(p) {
+            const banner = document.getElementById('golden-hour-banner');
+            const timerEl = document.getElementById('golden-hour-timer');
+            const bundleCard = document.getElementById('protocol-card');
+            const bundleStatus = document.getElementById('bundle-status');
+            
+            if (p.currentVitals.risk > 50) {
+                if (!p.goldenHourStart) {
+                    p.goldenHourStart = Date.now();
+                    addAuditLog("Golden Hour Protocol auto-initiated due to risk spike.");
+                    bundleCard.classList.add('ring-2', 'ring-sky-400');
+                    bundleStatus.innerText = "ACTIVE";
+                    bundleStatus.className = "text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold animate-pulse";
+                }
+                
+                const elapsed = Math.floor((Date.now() - p.goldenHourStart) / 1000);
+                const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const s = (elapsed % 60).toString().padStart(2, '0');
+                timerEl.innerText = `${m}:${s}`;
+                banner.classList.remove('hidden');
+                
+                // Color change over time (simulated fast: > 30s turns red for demo)
+                if (elapsed > 30) {
+                    banner.className = "bg-red-100 border-l-4 border-red-600 text-red-800 p-3 rounded mb-4 shadow-sm flex justify-between items-center transition-colors duration-500";
+                    timerEl.classList.add("text-red-700");
+                } else {
+                    banner.className = "bg-orange-100 border-l-4 border-orange-500 text-orange-800 p-3 rounded mb-4 shadow-sm flex justify-between items-center transition-colors duration-500";
+                    timerEl.classList.remove("text-red-700");
+                }
+
+                if (p.escalationLevel === 0) triggerEscalation(p);
+            } else {
+                banner.classList.add('hidden');
+                bundleCard.classList.remove('ring-2', 'ring-sky-400');
+                bundleStatus.innerText = "Standby";
+                bundleStatus.className = "text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full";
+                p.goldenHourStart = null;
+                resetEscalation(p);
+            }
+
+            // Check checklist completion
+            const checks = document.querySelectorAll('.proto-check');
+            let allChecked = true;
+            checks.forEach(c => { if(!c.checked) allChecked = false; });
+            if (allChecked && !p.protocolChecked && p.currentVitals.risk > 50) {
+                p.protocolChecked = true;
+                bundleStatus.innerText = "COMPLETED";
+                bundleStatus.className = "text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold";
+                p.timeline.unshift({ time: getNow(), msg: "3-Hour Sepsis Bundle completed by clinician.", type: 'info' });
+                addAuditLog("Sepsis bundle tasks marked as complete.");
+            }
+        }
+
+        function triggerEscalation(p) {
+            p.escalationLevel = 1;
+            const icon = document.getElementById('esc-icon');
+            const status = document.getElementById('esc-status');
+            const detail = document.getElementById('esc-detail');
+
+            icon.className = "w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-500 animate-pulse";
+            icon.innerHTML = `<i class="fa-solid fa-pager text-lg"></i>`;
+            status.innerText = "Paging Rapid Response...";
+            status.className = "text-sm font-bold text-amber-600";
+            detail.innerText = "Automated page sent to Dr. Soni";
+
+            if(p.escTimer) clearTimeout(p.escTimer);
+            p.escTimer = setTimeout(() => {
+                if(p.escalationLevel !== 1) return;
+                p.escalationLevel = 2;
+                icon.className = "w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-500 ring-2 ring-blue-300";
+                icon.innerHTML = `<i class="fa-solid fa-user-doctor text-lg"></i>`;
+                status.innerText = "Alert Acknowledged";
+                status.className = "text-sm font-bold text-blue-600";
+                detail.innerText = "ETA: 4 Minutes";
+                p.timeline.unshift({ time: getNow(), msg: "Dr. Soni acknowledged critical page.", type: 'info' });
+                addAuditLog("Remote doctor acknowledged alert via mobile app.");
+                renderTimeline(p);
+            }, 6000); // Simulate 6 seconds to acknowledge
+        }
+
+        function resetEscalation(p) {
+            p.escalationLevel = 0;
+            if(p.escTimer) clearTimeout(p.escTimer);
+            document.getElementById('esc-icon').className = "w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 transition-all";
+            document.getElementById('esc-icon').innerHTML = `<i class="fa-solid fa-user-doctor text-lg"></i>`;
+            document.getElementById('esc-status').innerText = "Monitoring Active";
+            document.getElementById('esc-status').className = "text-sm font-bold text-slate-700 transition-colors";
+            document.getElementById('esc-detail').innerText = "No critical alerts generated.";
+        }
+
+        function generateReport() {
+            if(!store.selectedId) return;
+            const p = store.patients.find(x => x.id === store.selectedId);
+            const v = p.currentVitals;
+            const date = new Date().toLocaleString();
+            
+            const report = `====================================================\nHEALTHPULSE CLINICAL REPORT\nGenerated: ${date}\n====================================================\n\nPATIENT DEMOGRAPHICS\n----------------------------------------------------\nName: ${p.name}\nID: ${p.id}\nAge: ${p.age} Years\nGender: ${p.gender}\nPrimary Condition: ${p.condition}\n\nLIVE VITALS SNAPSHOT\n----------------------------------------------------\nHeart Rate:    ${Math.round(v.hr)} bpm\nSpO2:          ${Math.round(v.spo2)} %\nBlood Press:   ${Math.round(v.sys)}/${Math.round(v.dia)} mmHg\nTemperature:   ${v.temp.toFixed(1)} °C\nResp Rate:     ${Math.round(v.rr)} rpm\n\nCLINICAL ASSESSMENTS\n----------------------------------------------------\nAI Sepsis Risk Score: ${Math.round(v.risk)}%\nGolden Hour Protocol: ${p.goldenHourStart ? 'ACTIVE' : 'STANDBY'}\nEscalation Level:     ${p.escalationLevel === 0 ? 'None' : p.escalationLevel === 1 ? 'Paging' : 'Acknowledged'}\n\nLAB RESULTS (Rapid Panel)\n----------------------------------------------------\nLactate:       ${document.getElementById('lab-lactate').innerText} mmol/L\nWBC Count:     ${document.getElementById('lab-wbc').innerText} K/uL\nCRP:           ${document.getElementById('lab-crp').innerText} mg/L\n\n====================================================\nEnd of Report`;
+
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `HealthPulse_Report_${p.id}_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            addAuditLog("Exported Quick Clinical Report to local device.");
+        }
+
+        function generateSOAP() {
+            if(!store.selectedId) return;
+            const p = store.patients.find(x => x.id === store.selectedId);
+            const v = p.currentVitals;
+            
+            let qsofa = 0; if(v.rr>=22) qsofa++; if(v.sys<=100) qsofa++; if(v.risk>60) qsofa++;
+
+            let sub = p.condition === 'Sepsis' ? "Patient shows acute signs of clinical deterioration and altered baseline. Continuous monitoring alerts active." : "Patient condition is stable. No acute distress reported at this time.";
+            let obj = `Vitals Snapshot:\n- HR: ${Math.round(v.hr)} bpm\n- SpO2: ${Math.round(v.spo2)}%\n- Temp: ${v.temp.toFixed(1)} °C\n- BP: ${Math.round(v.sys)}/${Math.round(v.dia)} mmHg\n- RR: ${Math.round(v.rr)} rpm\n\nLabs:\n- Lactate: ${document.getElementById('lab-lactate').innerText} mmol/L\n- WBC: ${document.getElementById('lab-wbc').innerText} K/uL`;
+            let ast = `1. Primary Diagnosis context: ${p.condition}\n2. AI Sepsis Probability Score: ${Math.round(v.risk)}%\n3. qSOFA Score: ${qsofa}/3`;
+            let plan = p.condition === 'Sepsis' ? "1. Initiate Severe Sepsis 3-hour bundle STAT.\n2. Draw peripheral blood cultures before Abx.\n3. Administer broad-spectrum IV antibiotics.\n4. Fluid resuscitation: 30ml/kg crystalloid.\n5. Continuous telemetry monitoring." : "1. Continue continuous non-invasive monitoring.\n2. Standard ward care protocol.\n3. Notify MD if parameters cross thresholds.";
+
+            document.getElementById('soap-content').value = `S: (Subjective)\n${sub}\n\nO: (Objective)\n${obj}\n\nA: (Assessment)\n${ast}\n\nP: (Plan)\n${plan}`;
+            document.getElementById('soap-modal').classList.remove('hidden');
+        }
+
+        function signSOAP() {
+            document.getElementById('soap-modal').classList.add('hidden');
+            addAuditLog("EHR Note (SOAP) signed and uploaded securely.");
+            const p = store.patients.find(x => x.id === store.selectedId);
+            p.timeline.unshift({ time: getNow(), msg: "Clinical note saved to EHR.", type: 'info' });
+            renderTimeline(p);
+        }
+
+        function addAuditLog(msg) {
+            const feed = document.getElementById('audit-log');
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = "border-l-2 border-slate-300 pl-2 py-1 fade-in bg-white p-2 rounded shadow-sm";
+            div.innerHTML = `<span class="text-slate-400 text-[10px] block mb-0.5">${time} | SYS_AUTH_110</span><span class="text-slate-700">${msg}</span>`;
+            feed.prepend(div);
+        }
+
+        function renderTimeline(p) {
+            const container = document.getElementById('patient-timeline');
+            if(!p.timeline || p.timeline.length === 0) return;
+            container.innerHTML = '';
+            p.timeline.forEach(ev => {
+                let ring = ev.type==='crit'?'ring-red-100':(ev.type==='warn'?'ring-amber-100':'ring-sky-100');
+                let dot = ev.type==='crit'?'bg-red-500':(ev.type==='warn'?'bg-amber-500':'bg-sky-500');
+                let txt = ev.type==='crit'?'text-red-700 font-bold':(ev.type==='warn'?'text-amber-700 font-medium':'text-slate-600 font-medium');
+
+                container.innerHTML += `
+                    <div class="relative pl-6 pb-4 fade-in last:pb-0 before:absolute before:left-[-1px] before:top-2 before:bottom-[-8px] before:w-0.5 before:bg-slate-100 last:before:bg-transparent">
+                        <div class="absolute -left-[5px] top-1.5 w-2.5 h-2.5 rounded-full ${dot} ring-4 ${ring}"></div>
+                        <div class="text-[10px] font-mono text-slate-400 mb-0.5">${ev.time}</div>
+                        <div class="text-sm ${txt}">${ev.msg}</div>
+                    </div>`;
+            });
+        }
+
+        function updateTrendArrow(id, cur, prev, hw) {
+            if (!prev) return;
+            const diff = cur - prev;
+            const el = document.getElementById(id);
+            if (Math.abs(diff) < 0.5) { el.innerText = '-'; el.className = "trend-arrow text-slate-400"; return; }
+            el.innerText = diff > 0 ? '↑' : '↓';
+            el.className = `trend-arrow ${(hw ? diff>0 : diff<0) ? 'text-red-500' : 'text-green-500'}`;
+        }
+
+        function updateSimulator() {
+            const hr = parseFloat(document.getElementById('sim-hr').value);
+            const spo2 = parseFloat(document.getElementById('sim-spo2').value);
+            const temp = parseFloat(document.getElementById('sim-temp').value);
+
+            document.getElementById('sim-hr-val').innerText = `${hr} bpm`;
+            document.getElementById('sim-spo2-val').innerText = `${spo2}%`;
+            document.getElementById('sim-temp-val').innerText = `${temp.toFixed(1)} °C`;
+
+            let risk = 5, triggers = [];
+            if(hr > 100) { risk += 25 + (hr - 100)*0.5; triggers.push('Tachycardia'); }
+            if(hr < 50) { risk += 20; triggers.push('Bradycardia'); }
+            if(spo2 < 94) { risk += 35 + (94 - spo2)*2; triggers.push('Hypoxemia'); }
+            if(temp > 38.0) { risk += 20 + (temp - 38)*5; triggers.push('Hyperthermia'); }
+
+            risk = Math.min(99, Math.max(0, risk));
+            const scoreEl = document.getElementById('sim-risk-score');
+            const textEl = document.getElementById('sim-risk-text');
+            scoreEl.innerText = `${Math.round(risk)}%`;
+
+            if(risk > 60) {
+                scoreEl.className = "text-5xl font-extrabold text-rose-500 animate-pulse transition-colors duration-300";
+                textEl.innerHTML = `<span class="text-rose-600 font-bold">CRITICAL RISK:</span> Triggered by <br/><span class="font-bold underline">${triggers.join(' + ')}</span>`;
+            } else if (risk > 30) {
+                scoreEl.className = "text-5xl font-extrabold text-amber-500 transition-colors duration-300";
+                textEl.innerHTML = `<span class="text-amber-600 font-bold">WARNING:</span> Elevated risk due to ${triggers.join(' + ')}.`;
+            } else {
+                scoreEl.className = "text-5xl font-extrabold text-emerald-500 transition-colors duration-300";
+                textEl.innerHTML = `Patient stable. Evaluated parameters are normal.`;
+            }
+        }
+
+        // --- IOT & CHARTS (Simplified for brevity but preserved structure) ---
+        function startIoTSimulation() {
+            let startTime = Date.now();
+            setInterval(() => {
+                const diff = Date.now() - startTime;
+                const h = Math.floor(diff/3600000).toString().padStart(2,'0'), m = Math.floor((diff%3600000)/60000).toString().padStart(2,'0'), s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
+                document.getElementById('iot-uptime').innerText = `${h}:${m}:${s}`;
+                document.getElementById('iot-pi-read').innerText = (3.0 + Math.random()).toFixed(1) + "%";
+                document.getElementById('iot-latency').innerText = `${35 + Math.floor(Math.random()*20)} ms`;
+                
+                const console = document.getElementById('raw-console');
+                const log = document.createElement('div');
+                log.innerText = `[${new Date().toISOString().split('T')[1].split('.')[0]}] STREAM_SYNC | PKT_ID:${Math.floor(Math.random()*9999)} | CRC:OK`;
+                console.prepend(log);
+                if(console.children.length > 10) console.lastChild.remove();
+            }, 1000);
+        }
+
+        function initHistoryCharts() {
+            const ctx1 = document.getElementById('history-chart').getContext('2d');
+            store.charts.history = new Chart(ctx1, { type: 'line', data: { labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'], datasets: [{ label: 'Heart Rate', data: [72, 70, 75, 80, 78, 74], borderColor: '#F43F5E', tension: 0.4 }, { label: 'SpO2', data: [98, 98, 97, 98, 96, 98], borderColor: '#0EA5E9', tension: 0.4, yAxisID: 'y1' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { position: 'left', min: 40, max: 120 }, y1: { position: 'right', min: 80, max: 100, grid: { drawOnChartArea: false } } } }});
+        }
+
+        const ecgCtx = document.getElementById('ecg-canvas').getContext('2d');
+        const ecgData = new Array(300).fill(70);
+        let ecgPhase = 0;
+        function ecgLoop() {
+            const hr = parseInt(document.getElementById('val-hr').innerText) || 70;
+            ecgPhase += (hr / 60 * 0.15); if(ecgPhase > Math.PI * 2) ecgPhase = 0;
+            let y = 70;
+            if(ecgPhase < 0.2) y -= Math.sin(ecgPhase * 10) * 5; 
+            else if(ecgPhase < 0.3) y += 5; else if(ecgPhase < 0.4) y -= 50; else if(ecgPhase < 0.5) y += 15; else if(ecgPhase > 0.6 && ecgPhase < 0.8) y -= Math.sin(ecgPhase * 5) * 8; 
+            ecgData.push(y + (Math.random() - 0.5)*2); ecgData.shift();
+            ecgCtx.clearRect(0,0,ecgCtx.canvas.width,ecgCtx.canvas.height);
+            ecgCtx.strokeStyle = store.isEmergency ? '#ef4444' : '#4ADE80'; ecgCtx.lineWidth = store.isEmergency ? 3 : 2; ecgCtx.lineJoin = 'round';
+            ecgCtx.beginPath();
+            ecgData.forEach((val, i) => { if(i===0) ecgCtx.moveTo(0, val); else ecgCtx.lineTo(i*(ecgCtx.canvas.width/ecgData.length), val); });
+            ecgCtx.stroke();
+            requestAnimationFrame(ecgLoop);
+        }
+        window.addEventListener('resize', () => { document.getElementById('ecg-canvas').width = document.getElementById('ecg-canvas').parentElement.clientWidth; document.getElementById('ecg-canvas').height = document.getElementById('ecg-canvas').parentElement.clientHeight; });
+        setTimeout(()=>window.dispatchEvent(new Event('resize')), 100);
+
+        function speakSummary() {
+            if(!store.selectedId) return;
+            const p = store.patients.find(x => x.id === store.selectedId);
+            if('speechSynthesis' in window) {
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(`Patient ${p.name}. Condition: ${p.condition}. Sepsis Risk ${Math.round(p.currentVitals.risk)}%.`));
+                addAuditLog("Audio summary generated.");
+            }
+        }
+        function showQRModal() {
+            if(!store.selectedId) return;
+            const p = store.patients.find(x => x.id === store.selectedId);
+            const appUrl = `${window.location.origin}/?patient=${p.id}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(appUrl)}`;
+            document.getElementById('qr-img').src = qrUrl;
+            document.getElementById('qr-url-text').innerText = appUrl;
+            document.getElementById('qr-modal').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
