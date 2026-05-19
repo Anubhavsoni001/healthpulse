@@ -1,7 +1,7 @@
 # 🩺 MediSense – AI-Powered Healthcare Platform
 
 ## 🚀 Live Demo
-[Visit HethPulse](healthpulse-beta.vercel.app/)
+[Visit HethPulse](healthpulse-beta.vercel.app)
 
 ---
 
